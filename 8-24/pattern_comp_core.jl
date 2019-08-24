@@ -16,25 +16,8 @@ wildcard(target, body) = body
 capture(sym::Symbol) = (target, body) ->
   Expr(:let, Expr(:block, :($sym = $target)), body)
 
-typed_as(T) = f -> (target, body) ->
-   let FN = gensym("type_$target"),
-       TARGET = gensym("$target"),
-       f1 = Expr(:function, :($FN($TARGET::$T)), :($(f(TARGET, body)))),
-       f2 = Expr(:function, :($FN($TARGET)), failed)
-       Expr(:block, f1, f2, :($FN($target)))
-   end
-
 literal(v) = (target, body) ->
   :($v == $target ? $body : $failed)
-
-recog(recogniser, get_field) = elts -> recogniser(
-  function (target, body)
-    n = elts |> length
-    foldr(1:n, init=body) do i, last
-      sub_target = get_field(target, i)
-      elts[i](sub_target, last)
-    end
-  end)
 
 and(p1, p2) = (target, body) ->
 	p1(target, p2(target, body))
@@ -50,8 +33,27 @@ or(p1, p2) = (target, body) ->
       )
   end
 
+# C(p1, p2, .., pn)
+# pattern = (target: code, remainder: code) -> code
+recog(recogniser, get_field) = elts -> recogniser(
+  function (target, body)
+    n = elts |> length
+    foldr(1:n, init=body) do i, last
+      sub_target = get_field(target, i)
+      elts[i](sub_target, last)
+    end
+  end)
 
 
+
+
+typed_as(T) = f -> (target, body) ->
+   let FN = gensym("f_$target"),
+       TARGET = gensym("$target"),
+       f1 = Expr(:function, :($FN($TARGET::$T)), :($(f(TARGET, body)))),
+       f2 = Expr(:function, :($FN($TARGET)), failed)
+       Expr(:block, f1, f2, :($FN($target)))
+   end
 
 match(target) = pairs ->
   let RET = gensym("or_$target"),
@@ -109,73 +111,77 @@ array_pat2(elts1, star, elts2) = # with ...
 
 # test
 
+@match target begin
+  (a, _, 3) => expr
+end
+
 tuple_pat(
-  (
-    literal(1),
-    wildcard,
-    and(capture(:a), guard(:(a > 1)))
-  )
-)(:a, :res) |> println
-
-array_pat2(
-  [literal(1)],
-  capture(:a),
-  [literal(2)]
-)(:a, :res) |> println
-
-
-p1 = tuple_pat(
   (
     capture(:a),
     wildcard,
     literal(3)
   )
-)
+)(:var, :expr1) |> println
 
-p1(:var, :expr1) |> println
-
-
-match(target) = pairs ->
-  let RET = gensym("or_$target"),
-      TAG = gensym("var_$target")
-      foldr(pairs, init=:(error("non-exhaustive"))) do (case, body), last
-          expr = case(TAG, body)
-          Expr(
-            :block,
-            :($RET = $expr),
-            :($RET === $failed ? $last : $RET)
-        )
-      end |> x -> Expr(:block, :($TAG = $target), x)
-  end
-
-macro test_ast(x)
-  match(x)([
-    p1 => :(a + 1),
-    wildcard => 5
-  ]) |> esc
-end
-
-match(:x)([
-    p1 => :(a + 1),
-    wildcard => 5
-]) |> println
+# array_pat2(
+#   [literal(1)],
+#   capture(:a),
+#   [literal(2)]
+# )(:a, :res) |> println
 
 
-function f1(x)
-  @test_ast x
-end
+# p1 = tuple_pat(
+#   (
+#     capture(:a),
+#     wildcard,
+#     literal(3)
+#   )
+# )
 
-function f2(x)
-  if x isa Tuple && length(x) == 3
-    x[1] + 1
-  else
-    5
-  end
+# p1(:var, :expr1) |> println
 
-end
-using InteractiveUtils, BenchmarkTools
-@code_warntype f1((1, 2, 3))
-println()
-@code_warntype f2((1, 2, 3))
-@btime f1((1, 2, 3))
-@btime f2((1, 2, 3))
+
+# match(target) = pairs ->
+#   let RET = gensym("or_$target"),
+#       TAG = gensym("var_$target")
+#       foldr(pairs, init=:(error("non-exhaustive"))) do (case, body), last
+#           expr = case(TAG, body)
+#           Expr(
+#             :block,
+#             :($RET = $expr),
+#             :($RET === $failed ? $last : $RET)
+#         )
+#       end |> x -> Expr(:block, :($TAG = $target), x)
+#   end
+
+# macro test_ast(x)
+#   match(x)([
+#     p1 => :(a + 1),
+#     wildcard => 5
+#   ]) |> esc
+# end
+
+# match(:x)([
+#     p1 => :(a + 1),
+#     wildcard => 5
+# ]) |> println
+
+
+# function f1(x)
+#   @test_ast x
+# end
+
+# function f2(x)
+#   if x isa Tuple && length(x) == 3
+#     x[1] + 1
+#   else
+#     5
+#   end
+
+# end
+# using InteractiveUtils, BenchmarkTools
+# @code_warntype f1((1, 2, 3))
+# println()
+# @code_warntype f2((1, 2, 3))
+# @btime f1((1, 2, 3))
+# @btime f2((1, 2, 3))

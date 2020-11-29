@@ -1,0 +1,9 @@
+backend dataclass
+
+type Exp =     # expression/表达式
+| Var(str)     # variable/变量 ; var => Var("var")
+| Val(object)  # value/值        1.0 => Var(1.0)
+| App(func: Exp, args: List[Exp])  # application/函数调用: f(a, b) => App(Var("f"), [Var("a"), Var("b")])
+| Func(args: List[str], body: Exp) # function/函数定义: lambda x, y, z: x + y + z
+| Ass(name: str, value: Exp)       # assignment/赋值: x = 1 + y
+| Block(List[Exp])                 # { x = 1; y = 2; x + y }

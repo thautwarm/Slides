@@ -1,0 +1,4 @@
+Ident [a-zA-Z_][a-zA-Z_0-9]*
+space \s+
+comment \#.*
+%ignore space, comment

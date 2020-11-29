@@ -1,0 +1,42 @@
+%%inline
+from datatype_manual import *
+from json.decoder import py_scanstring
+
+def unesc(x, f=py_scanstring):
+    """from the raw form of a double quoted string to a python string,
+    e.g.,
+        unesc('"asd"') == "asd"
+    """
+    return f(x, 1)[0]
+%%
+
+list[p] : p         { [$1] }
+        | list[p] p { $1.append($2); $1 }
+        ;
+
+seplist[sep, p] : p                { [$1] }
+                | seplist[sep, p] sep p { $1.append($3); $1 }
+                ;
+
+START : <BOF> list[exp] <EOF> { $2 };
+
+arg : <ident> { $1.value };
+
+exp : app { $1 }
+    | 'fun' '(' seplist[',', arg] ')' '=>' exp { Func($3, $6) }
+    | <ident> '=' exp   {  Ass($1.value, $3) }
+    | '{' list[exp] '}' { Block($2) }
+    | '{' '}'           { Block([]) }
+    ;
+
+app : atomexpr { $1 }
+    | app '(' seplist[',', exp] ')' { App($1, $3) } # f(a, b, c)
+    | app '(' ')'                   { App($1, []) }
+    ;
+
+atomexpr : <int>   { Val(int($1.value)) }
+         | <float> { Val(float($1.value)) }
+         | <str>   { Val(unesc($1.value)) }
+         | '(' exp ')' { $2 }
+         | <ident> { Var($1.value) }
+         ;

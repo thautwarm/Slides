@@ -1,0 +1,29 @@
+%%inline
+from typeschema import *
+%%
+
+list[p] : p         { [$1] }
+        | list[p] p { $1.append($2); $1 }
+        ;
+
+seplist[sep, p] : p                { [$1] }
+                | seplist[sep, p] sep p { $1.append($3); $1 }
+                ;
+
+START : <BOF> 'backend' <Ident> typeschema <EOF> { ($3.value,  $4) } ;
+
+typeschema : 'type' <Ident> '=' list[classdef] {TypeSchema($2.value, $4) } ;
+
+
+
+
+
+classdef : '|' <Ident> '(' seplist[',', fieldef] ')' { CaseTypeDef($2.value, $4) } ;
+
+fieldef : type             { FieldDef(None, $1) }
+        | <Ident> ':' type { FieldDef($1.value, $3) }
+        ;
+
+type : <Ident> { Typ($1.value, []) }
+     | <Ident> '[' seplist[',', type] ']' { Typ($1.value, $3) }
+     ;
